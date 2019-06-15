@@ -1,2 +1,30 @@
 # monkeymonkeyjit
-This is an m68k on m68k JIT library.
+This is an m68k on m68k JIT library -- for those not in the know, the m68k is the venerable Motorola 68000 processor used in a wide variety of classic home computers and game consoles. This is implemented as a real AmigaOS .library that can be loaded and shared between applications.
+
+While monkeymonkeyjit is much faster than any other m68k emulation on the Amiga, it is not as fast as native execution available with Macintosh emulators and definately requires a strong 680x0 processor; a 68040 or better is recommended.
+
+Currently, only the "classic" 68000 will be emulated. I have no intention of handling the 68020 or higher processors, 32-bit memory or floating point arithmetic.
+
+# Example Usage
+
+```javascript
+struct Library *mmjit_lib;
+struct MonkeyMonkeyJIT* mmjit;
+
+if(!(mmjit_lib = OpenLibrary("monkeymonkeyjit.library", 0)))
+  error("Unable to open monkeymonkeyjit.library");
+
+if(!(mmjit = mmjit_lib->AllocJit(mmjit_cpu_t* CPU)))
+  error("Unable to initialize monkeymonkeyjit");
+
+mmjit_lib->WriteMemory(mmjit, 0, rom_image);
+mmjit_lib->Reset(mmjit);
+
+do mmjit_lib->Run(mmjit, CYCLE_COUNT);
+while (mmjit_lib->State(mmjit) == MMJIT_RUNNING);
+```
+
+
+
+
+
