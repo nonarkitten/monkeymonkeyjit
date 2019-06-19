@@ -24,6 +24,14 @@ do mmjit_lib->Run(mmjit, CYCLE_COUNT);
 while (mmjit_lib->State(mmjit) == MMJIT_RUNNING);
 ```
 
+# Useful Links
+[Compiler Explorer (Amiga 68K Edition)](https://franke.ms/cex)
+
+[Compiler Explorer (Atari 68K Edition)](http://brownbot.mooo.com/)
+
+[Compiler Explorer (Original ARM/PPC/x86)](https://godbolt.org/)
+
+[Online Disassembler (Supports all 68K CPUs)](https://onlinedisassembler.com/odaweb/)
 
 
 
