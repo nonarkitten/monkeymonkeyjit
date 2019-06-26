@@ -5,25 +5,6 @@ While monkeymonkeyjit is much faster than any other m68k emulation on the Amiga,
 
 Currently, only the "classic" 68000 will be emulated. I have no intention of handling the 68020 or higher processors, 32-bit memory or floating point arithmetic.
 
-# Example Usage
-
-```javascript
-struct Library *mmjit_lib;
-struct MonkeyMonkeyJIT* mmjit;
-
-if(!(mmjit_lib = OpenLibrary("monkeymonkeyjit.library", 0)))
-  error("Unable to open monkeymonkeyjit.library");
-
-if(!(mmjit = mmjit_lib->AllocJit(mmjit_cpu_t* CPU)))
-  error("Unable to initialize monkeymonkeyjit");
-
-mmjit_lib->WriteMemory(mmjit, 0, rom_image);
-mmjit_lib->Reset(mmjit);
-
-do mmjit_lib->Run(mmjit, CYCLE_COUNT);
-while (mmjit_lib->State(mmjit) == MMJIT_RUNNING);
-```
-
 # Useful Links
 [Compiler Explorer (Amiga 68K Edition)](https://franke.ms/cex)
 
@@ -32,7 +13,3 @@ while (mmjit_lib->State(mmjit) == MMJIT_RUNNING);
 [Compiler Explorer (Original ARM/PPC/x86)](https://godbolt.org/)
 
 [Online Disassembler (Supports all 68K CPUs)](https://onlinedisassembler.com/odaweb/)
-
-
-
-
