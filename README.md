@@ -15,7 +15,7 @@ The JIT only runs user opcodes; as such, we will only save the address and data 
 ```
 move.w #$4000,_intena            ; disable interrupts
 movem.l a0-a7/d0-d7,host_state   ; save all current registers
-movem.l jit_state,a0-a7/d0-d7    ; restore our JIT state
+movem.l jit_state,a0-a7/d1-d7    ; restore our JIT state
 move.w #$C000,_intena            ; enable interrupts
 ```        
 
@@ -82,20 +82,6 @@ Any reverse branch is immediately preceeded by a SUB[Q] opcode to deduct the num
 ## exit code
 
 Once complete, obviously the reverse of the above is required. We also need to eat some CPU cycles (for timing) and return the NEXT entry point decided by the flow-control instruction we're handling as the last instruction. This will be dependant upon the opcode we're emulating.
-```
-move.w #$4000,_intena            ; disable interrupts
-
-; jump exit pre-handler
-
-movem.l a0-a7/d0-d7,jit_state    ; save all current registers
-movem.l host_state,a0-a7/d0-d7   ; restore our HOST state
-sub[q].l #<cycles_used>,cycles   ; consume some cpu cycles
-
-; jump exit post-handler
-
-move.w #$C000,_intena            ; enable interrupts
-rts                              ; and return to the host
-```
 
 ## jump exit handlers
 
@@ -103,65 +89,75 @@ When we need to terminate our block because of an unconditional jump or unhandle
 
 **Bcc**
 ```
-pre:
-  bcc .taken
-.nottaken
-  move #jit_pc,jit_pc_temp
-  bra .done
-.taken
-  move #jit_pc+displacement,jit_pc_temp
-.done
-
-post:
-  move.l jit_pc_temp,d0  
+  move.w       #$4000,_intena           ; disable interrupts
+  movem.l      a0-a7/d0-d7,jit_state    ; save all current registers
+  move.l       #jit_pc,d0               ; load PC into D0 (safe to abuse now)
+  bxx          .not_taken               ; use reverse condition of bcc
+  add.l        #displacement,d0         ; otherwise, add displacement
+  
+.not_taken
+  movem.l      host_state,a0-a7/d1-d7   ; restore our HOST state
+  sub[q].l     #<cycles_used>,cycles    ; consume some cpu cycles
+  move.w       #$C000,_intena           ; enable interrupts
+  rts                                   ; and return to the host
 ```
 
 **DBcc**
 ```
-pre:
-  dbcc Dx,.taken
-.nottaken
-  move #jit_pc,jit_pc_temp
-  bra .done
-.taken
-  move #jit_pc+displacement,jit_pc_temp
-.done
+  move.w       #$4000,_intena           ; disable interrupts
+  dbxx         dx,.taken                ; need to do this before we shelve regs
+  movem.l      a0-a7/d0-d7,jit_state    ; save all current registers  
+  move.l       #jit_pc,d0               ; dbcc falls to next opcode
+  movem.l      host_state,a0-a7/d1-d7   ; restore our HOST state
+  sub[q].l     #<cycles_used>,cycles    ; consume some cpu cycles
+  move.w       #$C000,_intena           ; enable interrupts
+  rts                                   ; and return to the host
 
-post:
-  move.l jit_pc_temp,d0  
+.taken
+  movem.l      a0-a7/d0-d7,jit_state    ; save all current registers  
+  move.l       #jit_pc+displacenet,d0   ; return new entry point
+  movem.l      host_state,a0-a7/d1-d7   ; restore our HOST state
+  sub[q].l     #<cycles_used>,cycles    ; consume some cpu cycles
+  move.w       #$C000,_intena           ; enable interrupts
+  rts                                   ; and return to the host
 ```
 
 **JMP**
 ```
-post:
-  lea <original-ea>,a0
-  move.l a0,d0
+  move.w       #$4000,_intena           ; disable interrupts
+  movem.l      a0-a7/d0-d7,jit_state    ; save all current registers  
+  lea          <original-ea>,a0         ; compute address of JMP
+  move.l       a0,d0                    ; and safe to return
+  movem.l      host_state,a0-a7/d1-d7   ; restore our HOST state
+  sub[q].l     #<cycles_used>,cycles    ; consume some cpu cycles
+  move.w       #$C000,_intena           ; enable interrupts
+  rts                                   ; and return to the host
 ```
 
 **JSR**
 ```
-pre:
-  move.l #jit_pc,-(sp)
-post:
-  lea <original-ea>,a0
-  move.l a0,d0
+  move.w       #$4000,_intena           ; disable interrupts
+  move.l       #jit_pc,-(sp)            ; push PC like JSR
+  movem.l      a0-a7/d0-d7,jit_state    ; save all current registers  
+  lea          <original-ea>,a0         ; compute address of JSR
+  move.l       a0,d0                    ; and safe to return
+  movem.l      host_state,a0-a7/d1-d7   ; restore our HOST state
+  sub[q].l     #<cycles_used>,cycles    ; consume some cpu cycles
+  move.w       #$C000,_intena           ; enable interrupts
+  rts                                   ; and return to the host
 ```
 
-**RTS**
+**RTS/RTD**
+These are identical operations; in RTS the offset #off below is 4 for RTS and 4 + diplacement for RTD.
 ```
-pre:
-  move.l (sp)+,jit_pc_temp
-post:
-  move.l jit_pc_temp,d0
-```
-
-**RTD**
-```
-pre:
-  move.l (sp)+,jit_pc_temp
-  add.w #displacememt,sp
-post:
-  move.l jit_pc_temp,d0
+  move.w       #$4000,_intena           ; disable interrupts
+  lea          #off(sp),sp              ; move stack pointer
+  movem.l      a0-a7/d0-d7,jit_state    ; save all current registers  
+  move.l       -#off(sp),d0             ; grab return address
+  movem.l      host_state,a0-a7/d1-d7   ; restore our HOST state
+  sub[q].l     #<cycles_used>,cycles    ; consume some cpu cycles
+  move.w       #$C000,_intena           ; enable interrupts
+  rts                                   ; and return to the host
 ```
 
 # Useful Links
