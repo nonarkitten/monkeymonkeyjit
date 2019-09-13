@@ -1,3 +1,5 @@
+#include "codemap.h"
+
 #define HASH_PRIME 49157
 #define HASH(X) ((X)%HASH_PRIME)
 
@@ -13,12 +15,13 @@ static bucket_t* hash_buckets[HASH_PRIME] = { 0 };
 static bool garbage_collect() {
     uint32_t removed = 0;                         // track how many we've freed
     uint32_t lru = 1<<31;                         // start lru at max int
+    uint32_t i;
     
     for(i=0; i<HASH_PRIME; i++) {                 // find LOWEST useage count first
         bucket_t* bucket = hash_buckets[i];
         while(bucket) {
-            if(use_count < lru) {
-                lru = use_count;
+            if(bucket->use_count < lru) {
+                lru = bucket->use_count;
                 if(lru == 1) break;               // exit early, lru cannot be < 1
             }
             bucket = bucket->next;
@@ -37,18 +40,18 @@ static bool garbage_collect() {
                 removed++;                        // and track that we did this
                                                   // it might be sufficient to exit here
             }
-        }
-        while(next) {                             // remaining items use loof-forward
-            if((next->use_count -= lru)) {        // still has a high use_count
-                bucket = next;                    // so we'll advance to the next
-            } else {
-                bucket->next = next->next;        // found another one to free
-                free(next->code)                  // so free all the memory again
-                free(next);
-                removed++;                        // and track thia
-            }
-            next = bucket->next;                  // advance the look-ahead pointer
+            while(next) {                         // remaining items use loof-forward
+                if((next->use_count -= lru)) {    // still has a high use_count
+                    bucket = next;                // so we'll advance to the next
+                } else {
+                    bucket->next = next->next;    // found another one to free
+                    free(next->code);             // so free all the memory again
+                    free(next);
+                    removed++;                    // and track thia
+                }
+                next = bucket->next;              // advance the look-ahead pointer
                                                   // it might be sufficient to exit here
+            }
         }
     }
     if(!removed) exit(1);                         // if nothing to remove, then die
@@ -71,11 +74,13 @@ static bucket_t* find_bucket(uint32_t address) {
 uint16_t* get_code_ptr(uint32_t address) {
     bucket_t* bucket = find_bucket(address);
     if(!bucket) return NULL;
-    return bucker->code;
+    return bucket->code;
 }
 
 void set_code_ptr(uint32_t address, uint16_t* code) {
     bucket_t* bucket = find_bucket(address);
+    uint16_t hash = address % HASH_PRIME;
+
     if(!bucket) {
         do bucket = malloc(sizeof(bucket_t));     // try to create new entry
         while (!bucket && garbage_collect());     // and try, try again
@@ -90,6 +95,7 @@ void set_code_ptr(uint32_t address, uint16_t* code) {
 }
 
 void free_code_ptrs(void) {
+    uint32_t i;
     for(i=0; i<HASH_PRIME; i++) {                 // removed zeroed entries
         bucket_t* bucket = hash_buckets[i];
         while(bucket) {

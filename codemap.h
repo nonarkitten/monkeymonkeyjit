@@ -15,6 +15,8 @@ is necessary.
 
 */
 
+#include "main.h"
+
 #ifndef __CODEMAP_H__
 #define __CODEMAP_H__
 
